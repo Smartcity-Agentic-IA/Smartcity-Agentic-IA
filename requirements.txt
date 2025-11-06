@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+langchain
+langgraph
+pydantic
+psycopg2-binary
+sqlalchemy
+pandas
+faker
+kafka-python
+geopandas
+prophet
+scikit-learn
+reportlab
+streamlit
