@@ -4,17 +4,17 @@ RACHID AIT ALI : Lead
 OUSSAMA MADIOUBI : Lead 
 CHADIA ELKHARMOUDI : Lead 
 
-
+waaaaaaaaaaaaaaaaaa oussama l7a9ir
 ## virtaul envirement
 ``py -m venv .venv ``
 ``.\.venv\Scripts\Activate.ps1``
 ``deactivate``
-``Hi``
+
 ## intall requirements
 ``pip install -r requirements.txt``
 
 ## Lancer vos conteneurs Docker localement
-
+ 
 Si tu as déjà ton docker-compose.yml, les commandes de base sont :
 
 Construire les images :
