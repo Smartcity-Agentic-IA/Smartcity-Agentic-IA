@@ -1,3 +1,10 @@
+## TEAM PROJECT
+
+RACHID AIT ALI : Lead 
+OUSSAMA MADIOUBI : Lead 
+CHADIA ELKHARMOUDI : Lead 
+
+
 ## virtaul envirement
 ``py -m venv .venv ``
 ``.\.venv\Scripts\Activate.ps1``
