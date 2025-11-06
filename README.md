@@ -2,7 +2,7 @@
 ``py -m venv .venv ``
 ``.\.venv\Scripts\Activate.ps1``
 ``deactivate``
-
+``Hi``
 ## intall requirements
 ``pip install -r requirements.txt``
 
