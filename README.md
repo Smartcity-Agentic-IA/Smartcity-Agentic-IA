@@ -1,13 +1,11 @@
-pip install -r requirements.txt
+``pip install -r requirements.txt``
 
 1️⃣ Lancer vos conteneurs Docker localement
 
 Si tu as déjà ton docker-compose.yml, les commandes de base sont :
 
 Construire les images :
-``
-docker-compose build
-``
+``docker-compose build``
 
 Démarrer les services :
 ``
