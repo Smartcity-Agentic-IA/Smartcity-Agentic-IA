@@ -1,10 +1,9 @@
 ## TEAM PROJECT
-
+CHADIA ELKHARMOUDI : Lead
 RACHID AIT ALI : Lead 
 OUSSAMA MADIOUBI : Lead 
-CHADIA ELKHARMOUDI : Lead 
 
-waaaaaaaaaaaaaaaaaa oussama l7a9ir
+
 ## virtaul envirement
 ``py -m venv .venv ``
 ``.\.venv\Scripts\Activate.ps1``
@@ -41,3 +40,16 @@ Arrêter les conteneurs :
 -f = suivi en temps réel
 
 Utile pour voir si le Collector Agent reçoit bien les messages Kafka
+
+
+### 5️⃣ Si tu veux une interface web (facultatif)
+
+Tu peux ajouter Kafka UI dans ton docker-compose.yml :
+
+kafka-ui:
+    image: provectuslabs/kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092"""
