@@ -1,10 +1,14 @@
+
+
+# SMARTCITY -AGENTIC AI
+
+
 ## TEAM PROJECT
 
 RACHID AIT ALI : Lead 
 OUSSAMA MADIOUBI : Lead 
 CHADIA ELKHARMOUDI : Lead 
 
-waaaaaaaaaaaaaaaaaa oussama l7a9ir
 ## virtaul envirement
 ``py -m venv .venv ``
 ``.\.venv\Scripts\Activate.ps1``
