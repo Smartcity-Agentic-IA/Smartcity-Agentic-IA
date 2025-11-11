@@ -1,5 +1,3 @@
-
-
 # SMARTCITY -AGENTIC AI
 
 
@@ -8,10 +6,6 @@ CHADIA ELKHARMOUDI : Lead
 RACHID AIT ALI : Lead 
 OUSSAMA MADIOUBI : Lead 
 
-<<<<<<< HEAD
-
-=======
->>>>>>> b02c3f5056f221ddc809fda30e526b1ab3d7c1cf
 ## virtaul envirement
 ``py -m venv .venv ``
 ``.\.venv\Scripts\Activate.ps1``
@@ -60,4 +54,20 @@ kafka-ui:
       - "8080:8080"
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092"""
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+
+Dans ton interface :
+
+Crée un topic principal, nommé :
+
+``city-sensors``
+
+Choisis un nombre de partitions (1 ou 3 pour commencer).
+
+Laisse la réplication à 1 si tu n’as qu’un seul broker.
+
+### run similator
+``python simulator.py``
+
+### acceder à postgresql
+docker exec -it smartcity-agentic-ai-postgres-1 psql -U smartcity -d smartcitydb
