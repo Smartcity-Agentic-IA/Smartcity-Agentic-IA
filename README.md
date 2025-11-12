@@ -6,7 +6,7 @@ CHADIA ELKHARMOUDI : Lead
 RACHID AIT ALI : Lead 
 OUSSAMA MADIOUBI : Lead 
 
-## virtaul envirement
+## virtual envirement
 ``py -m venv .venv ``
 ``.\.venv\Scripts\Activate.ps1``
 ``deactivate``
@@ -70,4 +70,5 @@ Laisse la réplication à 1 si tu n’as qu’un seul broker.
 ``python simulator.py``
 
 ### acceder à postgresql
-docker exec -it smartcity-agentic-ai-postgres-1 psql -U smartcity -d smartcitydb
+``docker exec -it smartcity-agentic-ai-postgres-1 psql -U smartcity -d smartcitydb``
+

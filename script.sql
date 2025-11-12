@@ -16,3 +16,14 @@ CREATE TABLE sensors_data (
 
 select * from sensors_data;
 
+CREATE TABLE IF NOT EXISTS actions (
+  id SERIAL PRIMARY KEY,
+  action_id VARCHAR(50) UNIQUE,
+  sensor_id VARCHAR(50),
+  event_type VARCHAR(100),
+  action_json JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  status VARCHAR(30) DEFAULT 'pending', -- pending / confirmed / rejected
+  feedback_by VARCHAR(100),
+  feedback_at TIMESTAMPTZ
+);
