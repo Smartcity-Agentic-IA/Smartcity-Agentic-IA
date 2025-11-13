@@ -105,23 +105,24 @@ def insert_alert(conn, a: AlertMessage):
 # ------------ Règles simples ------------
 
 def rule_check(msg: SensorMessage):
-    """
-    Règles simples :
-      - Déchets >= 90%  -> HIGH
-      - Trafic <= 15 km/h -> MEDIUM
-      - Éclairage lux <= 10 -> LOW
-    Tu pourras les adapter après.
-    """
+    # Déchets : poubelle presque pleine
     if msg.type == "waste" and msg.value >= 90:
         return "high", "threshold_waste_90"
 
+    # Trafic : très lent (bouchon)
     if msg.type == "traffic" and msg.value <= 15:
         return "medium", "low_speed_threshold"
 
+    # Éclairage : luminosité très faible
     if msg.type == "light" and msg.value <= 10:
         return "low", "low_lux_threshold"
 
+    # Eau : débit très élevé → suspicion de fuite
+    if msg.type == "water" and msg.value >= 8:
+        return "high", "high_flow_possible_leak"
+
     return None
+
 
 
 # ------------ Boucle principale ------------
