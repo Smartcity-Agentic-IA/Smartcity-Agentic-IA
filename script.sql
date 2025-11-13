@@ -27,3 +27,21 @@ CREATE TABLE IF NOT EXISTS actions (
   feedback_by VARCHAR(100),
   feedback_at TIMESTAMPTZ
 );
+
+
+CREATE TABLE IF NOT EXISTS alerts (
+  alert_id TEXT PRIMARY KEY,
+  sensor_id TEXT,
+  type TEXT,
+  severity TEXT,
+  reason TEXT,
+  value DOUBLE PRECISION,
+  expected DOUBLE PRECISION,
+  ts TIMESTAMP,
+  geom GEOGRAPHY(Point,4326)
+);
+
+CREATE INDEX IF NOT EXISTS alerts_ts_idx   ON alerts(ts);
+CREATE INDEX IF NOT EXISTS alerts_geom_idx ON alerts USING GIST(geom);
+
+
