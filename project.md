@@ -397,63 +397,9 @@ DEFAULT_THRESHOLD=3.0
 | **CPU Usage** | <15% | Par agent (moyenne) |
 | **Memory** | <200MB | Par agent (moyenne) |
 
-### Scalabilité
-
-- ✅ Horizontal scaling via Kafka partitions
-- ✅ Multiple instances de chaque agent
-- ✅ Load balancing automatique
-- ✅ Testés jusqu'à 100 capteurs simultanés
 
 ---
 
-## 🧪 Tests
-
-### Test Manuel Rapide
-
-Insérez une anomalie dans PostgreSQL:
-
-```sql
--- Congestion
-INSERT INTO sensors_data (sensor_id, type, value, unit, latitude, longitude, timestamp)
-VALUES ('TEST_001', 'traffic', 5.0, 'km/h', 33.5897, -7.6032, NOW());
-
--- Vérifiez l'action créée
-SELECT * FROM actions ORDER BY created_at DESC LIMIT 1;
-
--- Vérifiez l'exécution
-SELECT * FROM actuator_executions ORDER BY executed_at DESC LIMIT 1;
-```
-
-### Scénarios de Test
-
-```bash
-# Test de charge
-python tests/load_test.py
-
-# Test de résilience
-python tests/failover_test.py
-```
-
----
-
-## 📚 Documentation Additionnelle
-
-- [Architecture Détaillée](docs/ARCHITECTURE.md)
-- [Guide de Déploiement](docs/DEPLOYMENT.md)
-- [API Reference](docs/API.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-
----
-
-## 🤝 Contribution
-
-Les contributions sont les bienvenues! Suivez ces étapes:
-
-1. Fork le projet
-2. Créez votre branche (`git checkout -b feature/AmazingFeature`)
-3. Committez vos changements (`git commit -m 'Add AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
-5. Ouvrez une Pull Request
 
 ---
 
@@ -467,14 +413,6 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 - **chadia08** - *Développement principal* - [@chadia08](https://github.com/chadia08)
 
----
-
-## 🙏 Remerciements
-
-- Apache Kafka pour le message streaming
-- PostgreSQL et PostGIS pour la gestion des données spatiales
-- Streamlit pour le dashboard interactif
-- La communauté open source
 
 ---
 
@@ -484,7 +422,7 @@ Pour toute question ou suggestion:
 
 - **Email**: chadia.el.kharmoudi@gmail.com
 - **GitHub**: [@chadia08](https://github.com/chadia08)
-- **LinkedIn**: [Votre profil LinkedIn]
+- **LinkedIn**: [https://www.linkedin.com/in/chadia-el-kharmoudi/]
 
 ---
 
