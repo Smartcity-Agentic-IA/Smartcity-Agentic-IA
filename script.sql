@@ -27,3 +27,22 @@ CREATE TABLE IF NOT EXISTS actions (
   feedback_by VARCHAR(100),
   feedback_at TIMESTAMPTZ
 );
+
+
+
+-- Table pour logger les exécutions de l'actuator
+CREATE TABLE IF NOT EXISTS actuator_executions (
+    id SERIAL PRIMARY KEY,
+    action_id VARCHAR(50) NOT NULL,
+    sensor_id VARCHAR(50),
+    result_json JSONB,
+    status VARCHAR(20),
+    executed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    FOREIGN KEY (action_id) REFERENCES actions(action_id)
+);
+
+CREATE INDEX idx_actuator_executions_action_id ON actuator_executions(action_id);
+CREATE INDEX idx_actuator_executions_executed_at ON actuator_executions(executed_at);
+
+-- Vérification
+\d actuator_executions
