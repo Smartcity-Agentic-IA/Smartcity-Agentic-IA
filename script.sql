@@ -53,3 +53,12 @@ CREATE TABLE IF NOT EXISTS actions (
 CREATE INDEX IF NOT EXISTS actions_ts_idx   ON actions(ts);
 CREATE INDEX IF NOT EXISTS actions_geom_idx ON actions USING GIST(geom);
 
+
+
+--thresholds table
+CREATE TABLE IF NOT EXISTS thresholds (
+  type TEXT PRIMARY KEY,           -- 'waste', 'traffic', 'light', 'water'
+  rule_name TEXT,                  -- ex: 'dynamic_waste_high'
+  threshold_value DOUBLE PRECISION,
+  updated_at TIMESTAMP
+);

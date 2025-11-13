@@ -3,22 +3,19 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-print("DEBUG: watcher_agent.py is being executed")
-
 import psycopg2
 from pydantic import BaseModel, ValidationError
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.admin import KafkaAdminClient, NewTopic
 from kafka.errors import TopicAlreadyExistsError
 
-# On réutilise ton schéma de message capteur
-from agents.collector.schemas import SensorMessage
+print("DEBUG: watcher_agent.py is being executed")
 
+# ────────────────────────────────────────────────────────────────
+# CONFIG
+# ────────────────────────────────────────────────────────────────
 
-
-# ------------ Config ------------
-
-KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "127.0.0.1:9092")
 TOPIC_IN = os.getenv("TOPIC_IN", "city-sensors")
 TOPIC_OUT = os.getenv("TOPIC_OUT", "city-alerts")
 
@@ -31,28 +28,15 @@ PG = dict(
 )
 
 
-# ------------ Schéma d'alerte ------------
-
-class AlertMessage(BaseModel):
-    alert_id: str
-    sensor_id: str
-    type: str
-    severity: str          # "low","medium","high","critical"
-    reason: str            # ex: "threshold_waste_90"
-    value: float
-    expected: float | None
-    latitude: float
-    longitude: float
-    ts: datetime
-
-
-# ------------ Utils ------------
+# ────────────────────────────────────────────────────────────────
+# TOPIC AUTO-CREATION
+# ────────────────────────────────────────────────────────────────
 
 def ensure_topic(bootstrap: str, topic: str, partitions: int = 1, replication: int = 1):
-    """Crée le topic si nécessaire."""
     try:
         admin = KafkaAdminClient(bootstrap_servers=bootstrap, client_id="watcher-admin")
         topics = admin.list_topics()
+
         if topic not in topics:
             admin.create_topics([
                 NewTopic(name=topic, num_partitions=partitions, replication_factor=replication)
@@ -60,12 +44,47 @@ def ensure_topic(bootstrap: str, topic: str, partitions: int = 1, replication: i
             print(f"✅ Created topic: {topic}")
         else:
             print(f"ℹ️ Topic exists: {topic}")
+
         admin.close()
+
     except TopicAlreadyExistsError:
         print(f"ℹ️ Topic exists: {topic}")
+
     except Exception as e:
         print(f"⚠️ ensure_topic error for {topic}: {e}")
 
+
+# ────────────────────────────────────────────────────────────────
+# Pydantic Models
+# ────────────────────────────────────────────────────────────────
+
+class SensorMessage(BaseModel):
+    sensor_id: str
+    type: str
+    value: float
+    unit: str | None
+    latitude: float
+    longitude: float
+    timestamp: str
+    status: str | None
+
+
+class AlertMessage(BaseModel):
+    alert_id: str
+    sensor_id: str
+    type: str
+    severity: str
+    reason: str
+    value: float
+    expected: float | None
+    latitude: float
+    longitude: float
+    ts: datetime
+
+
+# ────────────────────────────────────────────────────────────────
+# Database Utils
+# ────────────────────────────────────────────────────────────────
 
 def pg_connect():
     conn = psycopg2.connect(**PG)
@@ -73,7 +92,7 @@ def pg_connect():
     return conn
 
 
-def insert_alert(conn, a: AlertMessage):
+def insert_alert(conn, alert: AlertMessage):
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -88,47 +107,83 @@ def insert_alert(conn, a: AlertMessage):
             )
             """,
             (
-                a.alert_id,
-                a.sensor_id,
-                a.type,
-                a.severity,
-                a.reason,
-                a.value,
-                a.expected,
-                a.ts,
-                a.longitude,
-                a.latitude,
+                alert.alert_id,
+                alert.sensor_id,
+                alert.type,
+                alert.severity,
+                alert.reason,
+                alert.value,
+                alert.expected,
+                alert.ts,
+                alert.longitude,
+                alert.latitude,
             )
         )
 
 
-# ------------ Règles simples ------------
+# ────────────────────────────────────────────────────────────────
+# Dynamic Threshold System
+# ────────────────────────────────────────────────────────────────
 
-def rule_check(msg: SensorMessage):
-    # Déchets : poubelle presque pleine
-    if msg.type == "waste" and msg.value >= 90:
-        return "high", "threshold_waste_90"
+DEFAULT_THRESHOLDS = {
+    "waste": 90.0,
+    "traffic": 15.0,
+    "light": 10.0,
+    "water": 8.0,
+}
 
-    # Trafic : très lent (bouchon)
-    if msg.type == "traffic" and msg.value <= 15:
-        return "medium", "low_speed_threshold"
 
-    # Éclairage : luminosité très faible
-    if msg.type == "light" and msg.value <= 10:
-        return "low", "low_lux_threshold"
+def load_thresholds(conn):
+    thresholds = DEFAULT_THRESHOLDS.copy()
 
-    # Eau : débit très élevé → suspicion de fuite
-    if msg.type == "water" and msg.value >= 8:
-        return "high", "high_flow_possible_leak"
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT type, threshold_value FROM thresholds")
+            for t, v in cur.fetchall():
+                thresholds[t] = float(v)
+
+    except Exception as e:
+        print(f"⚠️ Error loading thresholds, using defaults: {e}")
+
+    print("ℹ️ Active thresholds:", thresholds)
+    return thresholds
+
+
+# ────────────────────────────────────────────────────────────────
+# Anomaly Rules
+# ────────────────────────────────────────────────────────────────
+
+def rule_check(msg: SensorMessage, thr: dict[str, float]):
+    waste_thr = thr.get("waste", DEFAULT_THRESHOLDS["waste"])
+    traffic_thr = thr.get("traffic", DEFAULT_THRESHOLDS["traffic"])
+    light_thr = thr.get("light", DEFAULT_THRESHOLDS["light"])
+    water_thr = thr.get("water", DEFAULT_THRESHOLDS["water"])
+
+    # WASTE anomaly
+    if msg.type == "waste" and msg.value >= waste_thr:
+        return "high", "dynamic_waste_high"
+
+    # TRAFFIC anomaly
+    if msg.type == "traffic" and msg.value <= traffic_thr:
+        return "medium", "dynamic_traffic_low"
+
+    # LIGHT anomaly
+    if msg.type == "light" and msg.value <= light_thr:
+        return "low", "dynamic_light_low"
+
+    # WATER anomaly
+    if msg.type == "water" and msg.value >= water_thr:
+        return "high", "dynamic_water_high"
 
     return None
 
 
-
-# ------------ Boucle principale ------------
+# ────────────────────────────────────────────────────────────────
+# MAIN LOOP
+# ────────────────────────────────────────────────────────────────
 
 def run():
-    ensure_topic(KAFKA_BOOTSTRAP, TOPIC_OUT, partitions=1, replication=1)
+    ensure_topic(KAFKA_BOOTSTRAP, TOPIC_OUT)
 
     consumer = KafkaConsumer(
         TOPIC_IN,
@@ -145,6 +200,10 @@ def run():
     )
 
     pg = pg_connect()
+
+    # 🔥 Load thresholds ONCE (dynamic but static until next restart)
+    thresholds = load_thresholds(pg)
+
     print("✅ Watcher connected to Kafka & PostgreSQL")
     print(f"   Listening on topic: {TOPIC_IN}")
     print(f"   Producing alerts to: {TOPIC_OUT}")
@@ -156,11 +215,12 @@ def run():
             print("⚠️ Invalid sensor message:", ve)
             continue
 
-        rule_result = rule_check(sensor)
-        if not rule_result:
-            continue  # rien d'anormal
+        rule = rule_check(sensor, thresholds)
+        if not rule:
+            continue
 
-        severity, reason = rule_result
+        severity, reason = rule
+
         alert = AlertMessage(
             alert_id=str(uuid.uuid4()),
             sensor_id=sensor.sensor_id,
@@ -174,14 +234,13 @@ def run():
             ts=datetime.now(timezone.utc),
         )
 
-        # DB
         insert_alert(pg, alert)
-
-        # Kafka
         producer.send(TOPIC_OUT, alert.dict())
 
-        print(f"[ALERT] {alert.severity.upper()} {alert.reason} "
-              f"sensor={alert.sensor_id} value={alert.value}")
+        print(
+            f"[ALERT] {alert.severity.upper()} | {alert.reason} | "
+            f"sensor={alert.sensor_id} | value={alert.value}"
+        )
 
 
 if __name__ == "__main__":
