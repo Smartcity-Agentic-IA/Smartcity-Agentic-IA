@@ -16,18 +16,10 @@ CREATE TABLE sensors_data (
 
 select * from sensors_data;
 
-CREATE TABLE IF NOT EXISTS actions (
-  id SERIAL PRIMARY KEY,
-  action_id VARCHAR(50) UNIQUE,
-  sensor_id VARCHAR(50),
-  event_type VARCHAR(100),
-  action_json JSONB,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  status VARCHAR(30) DEFAULT 'pending', -- pending / confirmed / rejected
-  feedback_by VARCHAR(100),
-  feedback_at TIMESTAMPTZ
-);
 
+
+
+--alerts table
 
 CREATE TABLE IF NOT EXISTS alerts (
   alert_id TEXT PRIMARY KEY,
@@ -44,4 +36,20 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE INDEX IF NOT EXISTS alerts_ts_idx   ON alerts(ts);
 CREATE INDEX IF NOT EXISTS alerts_geom_idx ON alerts USING GIST(geom);
 
+
+--actions table
+CREATE TABLE IF NOT EXISTS actions (
+  action_id TEXT PRIMARY KEY,
+  action_type TEXT,
+  priority TEXT,
+  sensor_id TEXT,
+  targets TEXT[],
+  parameters JSONB,
+  ts TIMESTAMP,
+  geom GEOGRAPHY(Point,4326),
+  reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS actions_ts_idx   ON actions(ts);
+CREATE INDEX IF NOT EXISTS actions_geom_idx ON actions USING GIST(geom);
 
