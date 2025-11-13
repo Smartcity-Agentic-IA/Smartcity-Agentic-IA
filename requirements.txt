@@ -8,8 +8,4 @@ sqlalchemy
 pandas
 faker
 kafka-python
-geopandas
-prophet
-scikit-learn
-reportlab
-streamlit
+uvicorn

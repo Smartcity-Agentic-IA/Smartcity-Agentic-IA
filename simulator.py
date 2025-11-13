@@ -1,34 +1,90 @@
-# simulator.py
+import os
 import time
 import json
 import random
-import uuid
 from datetime import datetime, timezone
 from kafka import KafkaProducer
-from kafka.errors import KafkaError
+from kafka.admin import KafkaAdminClient, NewTopic
+from kafka.errors import TopicAlreadyExistsError, KafkaError
 from faker import Faker
 from agents.collector.schemas import SensorMessage
 
 fake = Faker()
 
-KAFKA_BOOTSTRAP = "localhost:9092"    # change to "kafka:9092" if in container network
+# Try addresses in order; override with env KAFKA_BOOTSTRAP if needed
+DEFAULT_CANDIDATES = [
+    os.getenv("KAFKA_BOOTSTRAP"),               # if user sets it
+    "127.0.0.1:9092",
+    "localhost:9092",
+    "host.docker.internal:9092",
+    "kafka:29092",
+    "kafka:9092",
+]
+BOOTSTRAP_CANDIDATES = [c for c in DEFAULT_CANDIDATES if c]
+
 TOPIC = "city-sensors"
 
-producer = KafkaProducer(
-    bootstrap_servers=KAFKA_BOOTSTRAP,
-    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-    retries=5
-)
+def try_admin_connect(bootstrap_list, timeout=5):
+    last_exc = None
+    for bs in bootstrap_list:
+        try:
+            admin = KafkaAdminClient(bootstrap_servers=bs, client_id="sim-admin", request_timeout_ms=timeout*1000)
+            print(f"✅ Admin connected to {bs}")
+            return admin, bs
+        except Exception as e:
+            last_exc = e
+            print(f"⚠️ Admin connect failed {bs}: {e}")
+    raise RuntimeError(f"Admin connect failed for all candidates. Last error: {last_exc}")
 
-# define a few sensors
-SENSOR_TYPES = {
-    "light": {"unit": "lux"},
-    "waste": {"unit": "%"},
-    "traffic": {"unit": "km/h"},
-    "water": {"unit": "m3/h"}
-}
+def ensure_topic(bootstrap_candidates, topic, partitions=1, replication=1):
+    try:
+        admin, used = try_admin_connect(bootstrap_candidates)
+    except Exception as e:
+        print(f"⚠️ Could not create/verify topic because admin connection failed: {e}")
+        return False
+    try:
+        existing = admin.list_topics()
+        if topic in existing:
+            print(f"ℹ️ Topic exists on {used}: {topic}")
+            return True
+        admin.create_topics([NewTopic(name=topic, num_partitions=partitions, replication_factor=replication)])
+        print(f"✅ Created topic {topic} on {used}")
+        return True
+    except TopicAlreadyExistsError:
+        print(f"ℹ️ Topic already exists: {topic}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Topic creation failed on {used}: {e}")
+        return False
+    finally:
+        try:
+            admin.close()
+        except:
+            pass
 
-# create a set of sensors with random positions inside a bbox (Casablanca example)
+def create_producer(bootstrap_candidates, retries=3):
+    last_exc = None
+    for bs in bootstrap_candidates:
+        for attempt in range(1, retries+1):
+            try:
+                p = KafkaProducer(
+                    bootstrap_servers=bs,
+                    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                    retries=5,
+                    request_timeout_ms=10000
+                )
+                # quick metadata request to ensure connectivity
+                p.bootstrap_connected()
+                print(f"✅ Producer connected to {bs}")
+                return p, bs
+            except Exception as e:
+                last_exc = e
+                print(f"⚠️ Producer connect attempt {attempt}/{retries} failed for {bs}: {e}")
+                time.sleep(1)
+    raise RuntimeError(f"Producer connect failed for all candidates. Last error: {last_exc}")
+
+# prepare sensors
+SENSOR_TYPES = {"light": {"unit": "lux"}, "waste": {"unit": "%"}, "traffic": {"unit": "km/h"}, "water": {"unit": "m3/h"}}
 def random_coord(lat_min=33.55, lat_max=33.60, lon_min=-7.65, lon_max=-7.55):
     return round(random.uniform(lat_min, lat_max), 6), round(random.uniform(lon_min, lon_max), 6)
 
@@ -37,26 +93,24 @@ sensors = []
 for i in range(NUM_SENSORS):
     t = random.choice(list(SENSOR_TYPES.keys()))
     lat, lon = random_coord()
-    sensors.append({
-        "sensor_id": f"{t.upper()}_{i:03d}",
-        "type": t,
-        "unit": SENSOR_TYPES[t]["unit"],
-        "lat": lat,
-        "lon": lon
-    })
+    sensors.append({"sensor_id": f"{t.upper()}_{i:03d}", "type": t, "unit": SENSOR_TYPES[t]["unit"], "lat": lat, "lon": lon})
+
+# run setup
+print("🔎 Candidates for Kafka bootstrap:", BOOTSTRAP_CANDIDATES)
+ensure_topic(BOOTSTRAP_CANDIDATES, TOPIC, partitions=1, replication=1)
+
+try:
+    producer, used_bs = create_producer(BOOTSTRAP_CANDIDATES, retries=4)
+except Exception as e:
+    print("❌ Cannot create Kafka producer. Exiting. Error:", e)
+    producer = None
+    used_bs = None
 
 def generate_value(sensor_type):
-    if sensor_type == "light":
-        # simulate luminosity in lux
-        return round(random.uniform(0, 300), 2)
-    if sensor_type == "waste":
-        # fill percentage
-        return round(random.uniform(0, 100), 1)
-    if sensor_type == "traffic":
-        # speed km/h
-        return round(random.uniform(5, 80), 1)
-    if sensor_type == "water":
-        return round(random.uniform(0, 10), 3)
+    if sensor_type == "light": return round(random.uniform(0,300),2)
+    if sensor_type == "waste": return round(random.uniform(0,100),1)
+    if sensor_type == "traffic": return round(random.uniform(5,80),1)
+    if sensor_type == "water": return round(random.uniform(0,10),3)
     return 0.0
 
 def build_message(s):
@@ -70,39 +124,42 @@ def build_message(s):
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": "OK"
     }
-    # validate with pydantic
-    SensorMessage(
-        sensor_id=msg["sensor_id"],
-        type=msg["type"],
-        value=msg["value"],
-        unit=msg.get("unit"),
-        latitude=msg["latitude"],
-        longitude=msg["longitude"],
-        timestamp=msg["timestamp"],
-        status=msg.get("status")
-    )
+    # quick Pydantic validation
+    try:
+        SensorMessage(**msg)
+    except Exception as e:
+        print(f"⚠️ Validation failed for {msg['sensor_id']}: {e}")
+        return None
     return msg
 
 def send_message(msg):
+    if producer is None:
+        print("⚠️ No producer available, skipping send")
+        return False
     try:
-        future = producer.send(TOPIC, msg)
-        record_metadata = future.get(timeout=10)
-        # optionally print metadata
-        print(f"Sent {msg['sensor_id']} to {record_metadata.topic} partition {record_metadata.partition} offset {record_metadata.offset}")
+        fut = producer.send(TOPIC, msg)
+        meta = fut.get(timeout=10)
+        print(f"Sent {msg['sensor_id']} → {meta.topic} (p{meta.partition} o{meta.offset})")
+        return True
     except KafkaError as e:
         print("Kafka error:", e)
-        # you can implement retries/backoff here
+        return False
 
 if __name__ == "__main__":
+    if producer is None:
+        print("❌ Producer not available. Set KAFKA_BOOTSTRAP env to a working broker (e.g. 127.0.0.1:9092 or kafka:29092) and retry.")
+    else:
+        print(f"🚀 Starting simulator producing to {TOPIC} via {used_bs}")
     try:
-        print("Starting simulator, producing to topic:", TOPIC)
         while True:
             s = random.choice(sensors)
             msg = build_message(s)
-            send_message(msg)
-            time.sleep(1.5)   # frequency between messages; adjust as needed
+            if msg:
+                send_message(msg)
+            time.sleep(1.5)
     except KeyboardInterrupt:
-        print("Simulator stopped by user")
+        print("🛑 Stopped by user")
     finally:
-        producer.flush()
-        producer.close()
+        if producer:
+            producer.flush()
+            producer.close()
